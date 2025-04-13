@@ -437,7 +437,8 @@ async function deleteProject(
     return { message: "Project deleted successfully" };
   }
 
-  return await response.json();
+  const result = await response.json();
+  return { message: typeof result === 'object' && result !== null && 'message' in result ? String(result.message) : 'Project deleted' };
 }
 
 /**
