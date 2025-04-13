@@ -1,0 +1,46 @@
+{
+  "name": "@piatra-open-source/gitlab-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for using the GitLab API with added functionality",
+  "license": "MIT",
+  "author": "Piatra Open Source (https://gitlab.com/piatra-automation)",
+  "homepage": "https://gitlab.com/piatra-automation/gitlab-mcp-server",
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.com/piatra-automation/gitlab-mcp-server.git"
+  },
+  "type": "module",
+  "bin": {
+    "gitlab-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && shx chmod +x dist/*.js",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.0.1",
+    "node-fetch": "^3.3.2",
+    "zod": "^3.22.4",
+    "zod-to-json-schema": "^3.23.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.19",
+    "@types/node-fetch": "^2.6.12",
+    "shx": "^0.3.4",
+    "typescript": "^5.3.3"
+  },
+  "keywords": [
+    "gitlab",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "assistant",
+    "claude",
+    "anthropic"
+  ]
+}
