@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-
+  
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -7,6 +7,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import fetch from "node-fetch";
+import type { Response } from './types.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import {
@@ -66,6 +67,14 @@ if (!GITLAB_PERSONAL_ACCESS_TOKEN) {
 }
 
 /**
+ * Utility function to properly encode file paths for GitLab API
+ * Keeps forward slashes as-is while encoding other special characters
+ */
+function encodeGitLabPath(filePath: string): string {
+  return encodeURIComponent(filePath).replace(/%2F/g, '/');
+}
+
+/**
  * Helper function to handle API errors with better messages
  */
 async function handleApiError(response: Response): Promise<never> {
@@ -77,6 +86,11 @@ async function handleApiError(response: Response): Promise<never> {
     const errorJson = JSON.parse(errorText);
     if (errorJson.message) {
       errorMessage += ` - ${errorJson.message}`;
+      
+      // Special handling for file path errors
+      if (errorJson.message.includes('file_path') && response.status === 400) {
+        errorMessage += `. Make sure the file path is correct and properly formatted. Remember that paths are case-sensitive.`;
+      }
     } else if (errorJson.error) {
       errorMessage += ` - ${errorJson.error}`;
     }
@@ -161,7 +175,13 @@ async function getFileContents(
   filePath: string,
   ref?: string
 ): Promise<GitLabContent> {
-  const encodedPath = encodeURIComponent(filePath);
+  // Check for potentially problematic file paths
+  if (filePath.includes('#') || filePath.includes('?') || filePath.includes('[') || filePath.includes(']')) {
+    console.warn(`Warning: File path '${filePath}' contains special characters that may cause issues with GitLab API. Consider renaming the file.`);
+  }
+  
+  // Ensure file path is properly encoded
+  const encodedPath = encodeGitLabPath(filePath);
   let url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/repository/files/${encodedPath}`;
   if (ref) {
     url += `?ref=${encodeURIComponent(ref)}`;
@@ -253,7 +273,8 @@ async function createOrUpdateFile(
   branch: string,
   previousPath?: string
 ): Promise<GitLabCreateUpdateFileResponse> {
-  const encodedPath = encodeURIComponent(filePath);
+  // Ensure file path is properly encoded
+  const encodedPath = encodeGitLabPath(filePath);
   const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/repository/files/${encodedPath}`;
 
   const body = {
@@ -263,13 +284,21 @@ async function createOrUpdateFile(
     ...(previousPath ? { previous_path: previousPath } : {})
   };
 
-  // Check if file exists
+  // Add better error handling for file path issues
   let method = "POST";
+  
   try {
     await getFileContents(projectId, filePath, branch);
     method = "PUT";
   } catch (error) {
     // File doesn't exist, use POST
+    // But if the error is not a 404, it could be a file path issue
+    if (error instanceof Error && !error.message.includes("404")) {
+      // Check if it's likely a file path error
+      if (error.message.includes("file_path") || error.message.includes("Bad Request")) {
+        throw new Error(`Invalid file path format for '${filePath}'. Make sure the path is correct and properly formatted.`);
+      }
+    }
   }
 
   const response = await fetch(url, {

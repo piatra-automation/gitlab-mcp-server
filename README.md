@@ -136,6 +136,29 @@ This implementation includes several enhancements over the original MCP GitLab s
    - Clear documentation of all supported parameters
    - More complete type definitions
 
+## Troubleshooting
+
+### "file_path should be a valid file path" Error
+
+If you encounter the error `GitLab API error (400): Bad Request - file_path should be a valid file path`, there are several possible causes:
+
+1. **File Path Format**: GitLab expects file paths to be valid and properly formatted. Make sure your file path:
+   - Does not contain invalid characters like `*`, `?`, `[`, `]` etc.
+   - Uses forward slashes (`/`) not backslashes (`\`)
+   - Is properly URL-encoded (handled by this library)
+
+2. **Case Sensitivity**: GitLab file paths are case-sensitive. Ensure your paths match the exact case of existing files.
+
+3. **Repository Structure**: The file path must exist in the repository structure for updates, or be valid for new files.
+
+4. **Special Characters**: Avoid using special characters in file names when possible. If you need to use characters like `#`, `?`, `[`, `]`, be aware that they might require special handling.
+
+### Other Common Issues
+
+- **Authentication Failures**: Make sure your `GITLAB_PERSONAL_ACCESS_TOKEN` has the necessary permissions.
+- **Permission Denied**: Ensure you have proper access rights to the repository and group.
+- **Rate Limiting**: GitLab API has rate limits that may temporarily block your access if exceeded.
+
 ## License
 
 MIT
