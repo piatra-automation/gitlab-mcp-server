@@ -25,6 +25,18 @@ This MCP server allows AI assistants (like Claude) to interact with GitLab repos
   - Create issues
   - Create merge requests
 
+- **Issues and Time Tracking**
+  - Get issues with filtering options
+  - Get detailed issue information
+  - Manage time tracking (estimates and spent time)
+  - View time tracking statistics
+
+- **Notes (Comments)**
+  - Retrieve issue comments
+  - Create new comments
+  - Update existing comments
+  - Delete comments
+
 ## Installation
 
 ### Global Installation
@@ -90,6 +102,17 @@ const childProcess = execFileSync(serverPath, {
 | `fork_repository` | Fork a project |
 | `create_issue` | Create a new issue |
 | `create_merge_request` | Create a new merge request |
+| `get_issues` | Get issues from a project with filtering options |
+| `get_issue` | Get a single issue with details |
+| `get_issue_time_stats` | Get time tracking statistics for an issue |
+| `set_time_estimate` | Set time estimate for an issue |
+| `reset_time_estimate` | Reset time estimate for an issue |
+| `add_spent_time` | Add spent time to an issue |
+| `reset_spent_time` | Reset spent time for an issue |
+| `get_notes` | Get comments/notes for an issue |
+| `create_note` | Create a comment on an issue |
+| `update_note` | Update an existing comment |
+| `delete_note` | Delete a comment from an issue |
 
 ## Example Usage
 
@@ -113,6 +136,28 @@ const updatedRepo = await claude.callMcp("gitlab", "update_project", {
 const deleteResult = await claude.callMcp("gitlab", "delete_project", {
   project_id: "12345678"
 });
+
+// Example: Get all issues with time tracking stats
+const issues = await claude.callMcp("gitlab", "get_issues", {
+  project_id: "12345678",
+  state: "opened",
+  with_time_stats: true
+});
+
+// Example: Add spent time to an issue
+const timeStats = await claude.callMcp("gitlab", "add_spent_time", {
+  project_id: "12345678", 
+  issue_iid: 42,
+  duration: "1h 30m" // Format: Xh Ym
+});
+
+// Example: Get all comments on an issue
+const notes = await claude.callMcp("gitlab", "get_notes", {
+  project_id: "12345678",
+  issue_iid: 42,
+  sort: "desc",
+  order_by: "created_at"
+});
 ```
 
 ## Improvements Over Original Implementation
@@ -122,6 +167,9 @@ This implementation includes several enhancements over the original MCP GitLab s
 1. **Additional API endpoints**:
    - `delete_project`: Properly delete GitLab projects
    - `update_project`: Update project settings including visibility
+   - `get_issues` & `get_issue`: Retrieve issues with filtering options
+   - Time tracking endpoints: Set/reset estimates and spent time
+   - Notes endpoints: Create, read, update, delete comments
 
 2. **Fixed namespace_id handling**:
    - Properly supports creating projects in group namespaces

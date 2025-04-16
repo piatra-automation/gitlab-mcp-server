@@ -21,6 +21,9 @@ import {
   GitLabSearchResponseSchema,
   GitLabTreeSchema,
   GitLabCommitSchema,
+  GitLabTimeStatsSchema,
+  GitLabNoteSchema,
+  GitLabEnhancedIssueSchema,
   CreateRepositoryOptionsSchema,
   CreateIssueOptionsSchema,
   CreateMergeRequestOptionsSchema,
@@ -36,6 +39,14 @@ import {
   CreateBranchSchema,
   DeleteProjectSchema,
   UpdateProjectSchema,
+  GetIssuesSchema,
+  GetIssueSchema,
+  GetTimeStatsSchema,
+  TimeTrackingSchema,
+  GetNotesSchema,
+  CreateNoteSchema,
+  UpdateNoteSchema,
+  DeleteNoteSchema,
   type GitLabFork,
   type GitLabReference,
   type GitLabRepository,
@@ -46,12 +57,15 @@ import {
   type GitLabSearchResponse,
   type GitLabTree,
   type GitLabCommit,
+  type GitLabTimeStats,
+  type GitLabNote,
+  type GitLabEnhancedIssue,
   type FileOperation,
 } from './schemas.js';
 
 const server = new Server({
   name: "gitlab-mcp-server",
-  version: "0.5.1",
+  version: "1.1.0",
 }, {
   capabilities: {
     tools: {}
@@ -502,67 +516,441 @@ async function updateProject(
   return GitLabRepositorySchema.parse(await response.json());
 }
 
+/**
+ * Get issues for a project with various filters
+ */
+async function getIssues(
+  projectId: string,
+  options: {
+    state?: 'opened' | 'closed' | 'all',
+    with_labels_details?: boolean,
+    milestone?: string,
+    scope?: 'created_by_me' | 'assigned_to_me' | 'all',
+    author_id?: number,
+    assignee_id?: number,
+    my_reaction_emoji?: string,
+    order_by?: 'created_at' | 'updated_at' | 'priority',
+    sort?: 'asc' | 'desc',
+    search?: string,
+    created_after?: string,
+    created_before?: string,
+    updated_after?: string,
+    updated_before?: string,
+    confidential?: boolean,
+    with_time_stats?: boolean,
+    page?: number,
+    per_page?: number
+  }
+): Promise<GitLabEnhancedIssue[]> {
+  const url = new URL(`${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues`);
+  
+  // Add all query parameters that are provided
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== undefined) {
+      url.searchParams.append(key, value.toString());
+    }
+  }
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`
+    }
+  });
+
+  if (!response.ok) {
+    return handleApiError(response);
+  }
+
+  return z.array(GitLabEnhancedIssueSchema).parse(await response.json());
+}
+
+/**
+ * Get a single issue with detailed information
+ */
+async function getIssue(
+  projectId: string,
+  issueIid: number | string,
+  withTimeStats: boolean = false
+): Promise<GitLabEnhancedIssue> {
+  const url = new URL(`${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues/${issueIid}`);
+  
+  if (withTimeStats) {
+    url.searchParams.append('with_time_stats', 'true');
+  }
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`
+    }
+  });
+
+  if (!response.ok) {
+    return handleApiError(response);
+  }
+
+  return GitLabEnhancedIssueSchema.parse(await response.json());
+}
+
+/**
+ * Get time tracking stats for an issue
+ */
+async function getIssueTimeStats(
+  projectId: string,
+  issueIid: number | string
+): Promise<GitLabTimeStats> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues/${issueIid}/time_stats`;
+
+  const response = await fetch(url, {
+    headers: {
+      "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`
+    }
+  });
+
+  if (!response.ok) {
+    return handleApiError(response);
+  }
+
+  return GitLabTimeStatsSchema.parse(await response.json());
+}
+
+/**
+ * Set time estimate for an issue
+ */
+async function setTimeEstimate(
+  projectId: string,
+  issueIid: number | string,
+  duration: string
+): Promise<GitLabTimeStats> {
+  const url = new URL(`${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues/${issueIid}/time_estimate`);
+  url.searchParams.append('duration', duration);
+
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`
+    }
+  });
+
+  if (!response.ok) {
+    return handleApiError(response);
+  }
+
+  return GitLabTimeStatsSchema.parse(await response.json());
+}
+
+/**
+ * Reset time estimate for an issue
+ */
+async function resetTimeEstimate(
+  projectId: string,
+  issueIid: number | string
+): Promise<GitLabTimeStats> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues/${issueIid}/reset_time_estimate`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`
+    }
+  });
+
+  if (!response.ok) {
+    return handleApiError(response);
+  }
+
+  return GitLabTimeStatsSchema.parse(await response.json());
+}
+
+/**
+ * Add spent time to an issue
+ */
+async function addSpentTime(
+  projectId: string,
+  issueIid: number | string,
+  duration: string
+): Promise<GitLabTimeStats> {
+  const url = new URL(`${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues/${issueIid}/add_spent_time`);
+  url.searchParams.append('duration', duration);
+
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`
+    }
+  });
+
+  if (!response.ok) {
+    return handleApiError(response);
+  }
+
+  return GitLabTimeStatsSchema.parse(await response.json());
+}
+
+/**
+ * Reset spent time for an issue
+ */
+async function resetSpentTime(
+  projectId: string,
+  issueIid: number | string
+): Promise<GitLabTimeStats> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues/${issueIid}/reset_spent_time`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`
+    }
+  });
+
+  if (!response.ok) {
+    return handleApiError(response);
+  }
+
+  return GitLabTimeStatsSchema.parse(await response.json());
+}
+
+/**
+ * Get notes (comments) for an issue
+ */
+async function getNotes(
+  projectId: string,
+  issueIid: number | string,
+  options: {
+    sort?: 'asc' | 'desc',
+    order_by?: 'created_at' | 'updated_at',
+    page?: number,
+    per_page?: number
+  } = {}
+): Promise<GitLabNote[]> {
+  const url = new URL(`${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues/${issueIid}/notes`);
+  
+  // Add all query parameters that are provided
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== undefined) {
+      url.searchParams.append(key, value.toString());
+    }
+  }
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`
+    }
+  });
+
+  if (!response.ok) {
+    return handleApiError(response);
+  }
+
+  return z.array(GitLabNoteSchema).parse(await response.json());
+}
+
+/**
+ * Create a new note (comment) on an issue
+ */
+async function createNote(
+  projectId: string,
+  issueIid: number | string,
+  body: string
+): Promise<GitLabNote> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues/${issueIid}/notes`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ body })
+  });
+
+  if (!response.ok) {
+    return handleApiError(response);
+  }
+
+  return GitLabNoteSchema.parse(await response.json());
+}
+
+/**
+ * Update an existing note (comment) on an issue
+ */
+async function updateNote(
+  projectId: string,
+  issueIid: number | string,
+  noteId: number | string,
+  body: string
+): Promise<GitLabNote> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues/${issueIid}/notes/${noteId}`;
+
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ body })
+  });
+
+  if (!response.ok) {
+    return handleApiError(response);
+  }
+
+  return GitLabNoteSchema.parse(await response.json());
+}
+
+/**
+ * Delete a note (comment) from an issue
+ */
+async function deleteNote(
+  projectId: string,
+  issueIid: number | string,
+  noteId: number | string
+): Promise<{ message: string }> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues/${issueIid}/notes/${noteId}`;
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`
+    }
+  });
+
+  if (!response.ok) {
+    return handleApiError(response);
+  }
+
+  // GitLab returns 204 No Content on successful deletion
+  if (response.status === 204) {
+    return { message: "Note deleted successfully" };
+  }
+
+  // If for some reason there's content, try to parse it
+  try {
+    const result = await response.json();
+    return { message: typeof result === 'object' && result !== null && 'message' in result ? String(result.message) : 'Note deleted' };
+  } catch {
+    return { message: "Note deleted successfully" };
+  }
+}
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: "create_or_update_file",
-        description: "Create or update a single file in a GitLab project",
+        name: \"create_or_update_file\",
+        description: \"Create or update a single file in a GitLab project\",
         inputSchema: zodToJsonSchema(CreateOrUpdateFileSchema)
       },
       {
-        name: "search_repositories",
-        description: "Search for GitLab projects",
+        name: \"search_repositories\",
+        description: \"Search for GitLab projects\",
         inputSchema: zodToJsonSchema(SearchRepositoriesSchema)
       },
       {
-        name: "create_repository",
-        description: "Create a new GitLab project",
+        name: \"create_repository\",
+        description: \"Create a new GitLab project\",
         inputSchema: zodToJsonSchema(CreateRepositorySchema)
       },
       {
-        name: "get_file_contents",
-        description: "Get the contents of a file or directory from a GitLab project",
+        name: \"get_file_contents\",
+        description: \"Get the contents of a file or directory from a GitLab project\",
         inputSchema: zodToJsonSchema(GetFileContentsSchema)
       },
       {
-        name: "push_files",
-        description: "Push multiple files to a GitLab project in a single commit",
+        name: \"push_files\",
+        description: \"Push multiple files to a GitLab project in a single commit\",
         inputSchema: zodToJsonSchema(PushFilesSchema)
       },
       {
-        name: "create_issue",
-        description: "Create a new issue in a GitLab project",
+        name: \"create_issue\",
+        description: \"Create a new issue in a GitLab project\",
         inputSchema: zodToJsonSchema(CreateIssueSchema)
       },
       {
-        name: "create_merge_request",
-        description: "Create a new merge request in a GitLab project",
+        name: \"create_merge_request\",
+        description: \"Create a new merge request in a GitLab project\",
         inputSchema: zodToJsonSchema(CreateMergeRequestSchema)
       },
       {
-        name: "fork_repository",
-        description: "Fork a GitLab project to your account or specified namespace",
+        name: \"fork_repository\",
+        description: \"Fork a GitLab project to your account or specified namespace\",
         inputSchema: zodToJsonSchema(ForkRepositorySchema)
       },
       {
-        name: "create_branch",
-        description: "Create a new branch in a GitLab project",
+        name: \"create_branch\",
+        description: \"Create a new branch in a GitLab project\",
         inputSchema: zodToJsonSchema(CreateBranchSchema)
       },
       {
-        name: "delete_project",
-        description: "Delete a GitLab project",
+        name: \"delete_project\",
+        description: \"Delete a GitLab project\",
         inputSchema: zodToJsonSchema(DeleteProjectSchema)
       },
       {
-        name: "update_project",
-        description: "Update a GitLab project's settings including visibility",
+        name: \"update_project\",
+        description: \"Update a GitLab project's settings including visibility\",
         inputSchema: zodToJsonSchema(UpdateProjectSchema)
+      },
+      // New tools for issues and time tracking
+      {
+        name: \"get_issues\",
+        description: \"Get issues from a GitLab project with various filters\",
+        inputSchema: zodToJsonSchema(GetIssuesSchema)
+      },
+      {
+        name: \"get_issue\",
+        description: \"Get a single issue from a GitLab project\",
+        inputSchema: zodToJsonSchema(GetIssueSchema)
+      },
+      {
+        name: \"get_issue_time_stats\",
+        description: \"Get time tracking statistics for an issue\",
+        inputSchema: zodToJsonSchema(GetTimeStatsSchema)
+      },
+      {
+        name: \"set_time_estimate\",
+        description: \"Set time estimate for an issue\",
+        inputSchema: zodToJsonSchema(TimeTrackingSchema)
+      },
+      {
+        name: \"reset_time_estimate\",
+        description: \"Reset time estimate for an issue\",
+        inputSchema: zodToJsonSchema(GetTimeStatsSchema)
+      },
+      {
+        name: \"add_spent_time\",
+        description: \"Add spent time to an issue\",
+        inputSchema: zodToJsonSchema(TimeTrackingSchema)
+      },
+      {
+        name: \"reset_spent_time\",
+        description: \"Reset spent time for an issue\",
+        inputSchema: zodToJsonSchema(GetTimeStatsSchema)
+      },
+      // New tools for notes (comments)
+      {
+        name: \"get_notes\",
+        description: \"Get notes (comments) for an issue\",
+        inputSchema: zodToJsonSchema(GetNotesSchema)
+      },
+      {
+        name: \"create_note\",
+        description: \"Create a new note (comment) on an issue\",
+        inputSchema: zodToJsonSchema(CreateNoteSchema)
+      },
+      {
+        name: \"update_note\",
+        description: \"Update an existing note (comment) on an issue\",
+        inputSchema: zodToJsonSchema(UpdateNoteSchema)
+      },
+      {
+        name: \"delete_note\",
+        description: \"Delete a note (comment) from an issue\",
+        inputSchema: zodToJsonSchema(DeleteNoteSchema)
       }
     ]
   };
 });
+
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
@@ -658,6 +1046,76 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const args = UpdateProjectSchema.parse(request.params.arguments);
         const { project_id, ...options } = args;
         const result = await updateProject(project_id, options);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      // New cases for issues and time tracking
+      case "get_issues": {
+        const args = GetIssuesSchema.parse(request.params.arguments);
+        const { project_id, ...options } = args;
+        const issues = await getIssues(project_id, options);
+        return { content: [{ type: "text", text: JSON.stringify(issues, null, 2) }] };
+      }
+      
+      case "get_issue": {
+        const args = GetIssueSchema.parse(request.params.arguments);
+        const issue = await getIssue(args.project_id, args.issue_iid, args.with_time_stats);
+        return { content: [{ type: "text", text: JSON.stringify(issue, null, 2) }] };
+      }
+      
+      case "get_issue_time_stats": {
+        const args = GetTimeStatsSchema.parse(request.params.arguments);
+        const timeStats = await getIssueTimeStats(args.project_id, args.issue_iid);
+        return { content: [{ type: "text", text: JSON.stringify(timeStats, null, 2) }] };
+      }
+      
+      case "set_time_estimate": {
+        const args = TimeTrackingSchema.parse(request.params.arguments);
+        const result = await setTimeEstimate(args.project_id, args.issue_iid, args.duration);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+      
+      case "reset_time_estimate": {
+        const args = GetTimeStatsSchema.parse(request.params.arguments);
+        const result = await resetTimeEstimate(args.project_id, args.issue_iid);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+      
+      case "add_spent_time": {
+        const args = TimeTrackingSchema.parse(request.params.arguments);
+        const result = await addSpentTime(args.project_id, args.issue_iid, args.duration);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+      
+      case "reset_spent_time": {
+        const args = GetTimeStatsSchema.parse(request.params.arguments);
+        const result = await resetSpentTime(args.project_id, args.issue_iid);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+      
+      // Cases for notes (comments)
+      case "get_notes": {
+        const args = GetNotesSchema.parse(request.params.arguments);
+        const { project_id, issue_iid, ...options } = args;
+        const notes = await getNotes(project_id, issue_iid, options);
+        return { content: [{ type: "text", text: JSON.stringify(notes, null, 2) }] };
+      }
+      
+      case "create_note": {
+        const args = CreateNoteSchema.parse(request.params.arguments);
+        const note = await createNote(args.project_id, args.issue_iid, args.body);
+        return { content: [{ type: "text", text: JSON.stringify(note, null, 2) }] };
+      }
+      
+      case "update_note": {
+        const args = UpdateNoteSchema.parse(request.params.arguments);
+        const note = await updateNote(args.project_id, args.issue_iid, args.note_id, args.body);
+        return { content: [{ type: "text", text: JSON.stringify(note, null, 2) }] };
+      }
+      
+      case "delete_note": {
+        const args = DeleteNoteSchema.parse(request.params.arguments);
+        const result = await deleteNote(args.project_id, args.issue_iid, args.note_id);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
 

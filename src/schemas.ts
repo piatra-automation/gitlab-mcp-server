@@ -342,3 +342,156 @@ export type GitLabSearchResponse = z.infer<typeof GitLabSearchResponseSchema>;
 // Types for the new schemas
 export type DeleteProject = z.infer<typeof DeleteProjectSchema>;
 export type UpdateProject = z.infer<typeof UpdateProjectSchema>;
+
+// Time tracking schemas
+export const GitLabTimeStatsSchema = z.object({
+  time_estimate: z.number().describe("Estimated time in seconds"),
+  total_time_spent: z.number().describe("Time spent in seconds"),
+  human_time_estimate: z.string().nullable().describe("Human-readable time estimate"),
+  human_total_time_spent: z.string().nullable().describe("Human-readable time spent")
+});
+
+// System note metadata schemas
+export const GitLabSystemNoteMetadataSchema = z.object({
+  action: z.string().optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional()
+});
+
+// Note schema
+export const GitLabNoteSchema = z.object({
+  id: z.number(),
+  author: GitLabUserSchema,
+  body: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  system: z.boolean(),
+  noteable_id: z.number(),
+  noteable_type: z.string(),
+  noteable_iid: z.number(),
+  position: z.object({}).optional(),
+  resolvable: z.boolean().optional(),
+  resolved: z.boolean().optional(),
+  resolved_by: GitLabUserSchema.nullable().optional(),
+  system_note_metadata: GitLabSystemNoteMetadataSchema.optional()
+});
+
+// Enhance issue schema to include time tracking stats
+export const GitLabEnhancedIssueSchema = GitLabIssueSchema.extend({
+  time_stats: GitLabTimeStatsSchema.optional(),
+  task_completion_status: z.object({
+    count: z.number(),
+    completed_count: z.number()
+  }).optional()
+});
+
+// API Operation Parameter Schemas for issues and time tracking
+
+// Get issues in a project
+export const GetIssuesSchema = ProjectParamsSchema.extend({
+  state: z.enum(['opened', 'closed', 'all']).optional()
+    .describe("Return all issues or just those that are opened or closed"),
+  with_labels_details: z.boolean().optional()
+    .describe("Return detailed labels data"),
+  milestone: z.string().optional()
+    .describe("Return issues for a specific milestone"),
+  scope: z.enum(['created_by_me', 'assigned_to_me', 'all']).optional()
+    .describe("Return issues for the given scope"),
+  author_id: z.number().optional()
+    .describe("Return issues created by the given user id"),
+  assignee_id: z.number().optional()
+    .describe("Return issues assigned to the given user id"),
+  my_reaction_emoji: z.string().optional()
+    .describe("Return issues reacted by the authenticated user by the given emoji"),
+  order_by: z.enum(['created_at', 'updated_at', 'priority']).optional()
+    .describe("Return issues ordered by created_at, updated_at, or priority fields"),
+  sort: z.enum(['asc', 'desc']).optional()
+    .describe("Return issues sorted in ascending or descending order"),
+  search: z.string().optional()
+    .describe("Search issues against their title and description"),
+  created_after: z.string().optional()
+    .describe("Return issues created after the given time"),
+  created_before: z.string().optional()
+    .describe("Return issues created before the given time"),
+  updated_after: z.string().optional()
+    .describe("Return issues updated after the given time"),
+  updated_before: z.string().optional()
+    .describe("Return issues updated before the given time"),
+  confidential: z.boolean().optional()
+    .describe("Filter confidential or public issues"),
+  with_time_stats: z.boolean().optional()
+    .describe("Include time tracking stats"),
+  page: z.number().optional()
+    .describe("Page number"),
+  per_page: z.number().optional()
+    .describe("Number of items per page")
+});
+
+// Get single issue
+export const GetIssueSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue"),
+  with_time_stats: z.boolean().optional()
+    .describe("Include time tracking stats")
+});
+
+// Get issue time stats
+export const GetTimeStatsSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue")
+});
+
+// Time tracking schema for estimate and spent operations
+export const TimeTrackingSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue"),
+  duration: z.string()
+    .describe("The duration in human-readable format (e.g., '3h 30m')")
+});
+
+// Notes parameter schemas
+
+// Get notes for an issue
+export const GetNotesSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue"),
+  sort: z.enum(['asc', 'desc']).optional()
+    .describe("Return notes sorted in ascending or descending order"),
+  order_by: z.enum(['created_at', 'updated_at']).optional()
+    .describe("Return notes ordered by created_at or updated_at fields"),
+  page: z.number().optional()
+    .describe("Page number"),
+  per_page: z.number().optional()
+    .describe("Number of items per page")
+});
+
+// Create a note
+export const CreateNoteSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue"),
+  body: z.string()
+    .describe("The content of the note")
+});
+
+// Update a note
+export const UpdateNoteSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue"),
+  note_id: z.number().or(z.string())
+    .describe("The ID of the note"),
+  body: z.string()
+    .describe("The content of the note")
+});
+
+// Delete a note
+export const DeleteNoteSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue"),
+  note_id: z.number().or(z.string())
+    .describe("The ID of the note")
+});
+
+// Export types
+export type GitLabTimeStats = z.infer<typeof GitLabTimeStatsSchema>;
+export type GitLabNote = z.infer<typeof GitLabNoteSchema>;
+export type GitLabEnhancedIssue = z.infer<typeof GitLabEnhancedIssueSchema>;
