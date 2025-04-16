@@ -836,115 +836,115 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: \"create_or_update_file\",
-        description: \"Create or update a single file in a GitLab project\",
+        name: "create_or_update_file",
+        description: "Create or update a single file in a GitLab project",
         inputSchema: zodToJsonSchema(CreateOrUpdateFileSchema)
       },
       {
-        name: \"search_repositories\",
-        description: \"Search for GitLab projects\",
+        name: "search_repositories",
+        description: "Search for GitLab projects",
         inputSchema: zodToJsonSchema(SearchRepositoriesSchema)
       },
       {
-        name: \"create_repository\",
-        description: \"Create a new GitLab project\",
+        name: "create_repository",
+        description: "Create a new GitLab project",
         inputSchema: zodToJsonSchema(CreateRepositorySchema)
       },
       {
-        name: \"get_file_contents\",
-        description: \"Get the contents of a file or directory from a GitLab project\",
+        name: "get_file_contents",
+        description: "Get the contents of a file or directory from a GitLab project",
         inputSchema: zodToJsonSchema(GetFileContentsSchema)
       },
       {
-        name: \"push_files\",
-        description: \"Push multiple files to a GitLab project in a single commit\",
+        name: "push_files",
+        description: "Push multiple files to a GitLab project in a single commit",
         inputSchema: zodToJsonSchema(PushFilesSchema)
       },
       {
-        name: \"create_issue\",
-        description: \"Create a new issue in a GitLab project\",
+        name: "create_issue",
+        description: "Create a new issue in a GitLab project",
         inputSchema: zodToJsonSchema(CreateIssueSchema)
       },
       {
-        name: \"create_merge_request\",
-        description: \"Create a new merge request in a GitLab project\",
+        name: "create_merge_request",
+        description: "Create a new merge request in a GitLab project",
         inputSchema: zodToJsonSchema(CreateMergeRequestSchema)
       },
       {
-        name: \"fork_repository\",
-        description: \"Fork a GitLab project to your account or specified namespace\",
+        name: "fork_repository",
+        description: "Fork a GitLab project to your account or specified namespace",
         inputSchema: zodToJsonSchema(ForkRepositorySchema)
       },
       {
-        name: \"create_branch\",
-        description: \"Create a new branch in a GitLab project\",
+        name: "create_branch",
+        description: "Create a new branch in a GitLab project",
         inputSchema: zodToJsonSchema(CreateBranchSchema)
       },
       {
-        name: \"delete_project\",
-        description: \"Delete a GitLab project\",
+        name: "delete_project",
+        description: "Delete a GitLab project",
         inputSchema: zodToJsonSchema(DeleteProjectSchema)
       },
       {
-        name: \"update_project\",
-        description: \"Update a GitLab project's settings including visibility\",
+        name: "update_project",
+        description: "Update a GitLab project's settings including visibility",
         inputSchema: zodToJsonSchema(UpdateProjectSchema)
       },
       // New tools for issues and time tracking
       {
-        name: \"get_issues\",
-        description: \"Get issues from a GitLab project with various filters\",
+        name: "get_issues",
+        description: "Get issues from a GitLab project with various filters",
         inputSchema: zodToJsonSchema(GetIssuesSchema)
       },
       {
-        name: \"get_issue\",
-        description: \"Get a single issue from a GitLab project\",
+        name: "get_issue",
+        description: "Get a single issue from a GitLab project",
         inputSchema: zodToJsonSchema(GetIssueSchema)
       },
       {
-        name: \"get_issue_time_stats\",
-        description: \"Get time tracking statistics for an issue\",
+        name: "get_issue_time_stats",
+        description: "Get time tracking statistics for an issue",
         inputSchema: zodToJsonSchema(GetTimeStatsSchema)
       },
       {
-        name: \"set_time_estimate\",
-        description: \"Set time estimate for an issue\",
+        name: "set_time_estimate",
+        description: "Set time estimate for an issue",
         inputSchema: zodToJsonSchema(TimeTrackingSchema)
       },
       {
-        name: \"reset_time_estimate\",
-        description: \"Reset time estimate for an issue\",
+        name: "reset_time_estimate",
+        description: "Reset time estimate for an issue",
         inputSchema: zodToJsonSchema(GetTimeStatsSchema)
       },
       {
-        name: \"add_spent_time\",
-        description: \"Add spent time to an issue\",
+        name: "add_spent_time",
+        description: "Add spent time to an issue",
         inputSchema: zodToJsonSchema(TimeTrackingSchema)
       },
       {
-        name: \"reset_spent_time\",
-        description: \"Reset spent time for an issue\",
+        name: "reset_spent_time",
+        description: "Reset spent time for an issue",
         inputSchema: zodToJsonSchema(GetTimeStatsSchema)
       },
       // New tools for notes (comments)
       {
-        name: \"get_notes\",
-        description: \"Get notes (comments) for an issue\",
+        name: "get_notes",
+        description: "Get notes (comments) for an issue",
         inputSchema: zodToJsonSchema(GetNotesSchema)
       },
       {
-        name: \"create_note\",
-        description: \"Create a new note (comment) on an issue\",
+        name: "create_note",
+        description: "Create a new note (comment) on an issue",
         inputSchema: zodToJsonSchema(CreateNoteSchema)
       },
       {
-        name: \"update_note\",
-        description: \"Update an existing note (comment) on an issue\",
+        name: "update_note",
+        description: "Update an existing note (comment) on an issue",
         inputSchema: zodToJsonSchema(UpdateNoteSchema)
       },
       {
-        name: \"delete_note\",
-        description: \"Delete a note (comment) from an issue\",
+        name: "delete_note",
+        description: "Delete a note (comment) from an issue",
         inputSchema: zodToJsonSchema(DeleteNoteSchema)
       }
     ]
