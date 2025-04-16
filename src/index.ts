@@ -65,7 +65,7 @@ import {
 
 const server = new Server({
   name: "gitlab-mcp-server",
-  version: "1.1.1",
+  version: "1.1.2",
 }, {
   capabilities: {
     tools: {}
@@ -750,9 +750,12 @@ async function getNotes(
 async function createNote(
   projectId: string,
   issueIid: number | string,
-  body: string
+  body: string | Record<string, any>
 ): Promise<GitLabNote> {
   const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues/${issueIid}/notes`;
+
+  // Handle the case when body is an object by converting it to JSON string
+  const bodyContent = typeof body === 'object' ? JSON.stringify(body) : body;
 
   const response = await fetch(url, {
     method: "POST",
@@ -760,7 +763,7 @@ async function createNote(
       "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ body })
+    body: JSON.stringify({ body: bodyContent })
   });
 
   if (!response.ok) {
@@ -777,9 +780,12 @@ async function updateNote(
   projectId: string,
   issueIid: number | string,
   noteId: number | string,
-  body: string
+  body: string | Record<string, any>
 ): Promise<GitLabNote> {
   const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/issues/${issueIid}/notes/${noteId}`;
+
+  // Handle the case when body is an object by converting it to JSON string
+  const bodyContent = typeof body === 'object' ? JSON.stringify(body) : body;
 
   const response = await fetch(url, {
     method: "PUT",
@@ -787,7 +793,7 @@ async function updateNote(
       "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ body })
+    body: JSON.stringify({ body: bodyContent })
   });
 
   if (!response.ok) {
@@ -934,12 +940,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "create_note",
-        description: "Create a new note (comment) on an issue",
+        description: "Create a new note (comment) on an issue - supports both string and JSON object bodies",
         inputSchema: zodToJsonSchema(CreateNoteSchema)
       },
       {
         name: "update_note",
-        description: "Update an existing note (comment) on an issue",
+        description: "Update an existing note (comment) on an issue - supports both string and JSON object bodies",
         inputSchema: zodToJsonSchema(UpdateNoteSchema)
       },
       {
@@ -1103,12 +1109,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       
       case "create_note": {
         const args = CreateNoteSchema.parse(request.params.arguments);
+        // Note: body can now be a string or an object
         const note = await createNote(args.project_id, args.issue_iid, args.body);
         return { content: [{ type: "text", text: JSON.stringify(note, null, 2) }] };
       }
       
       case "update_note": {
         const args = UpdateNoteSchema.parse(request.params.arguments);
+        // Note: body can now be a string or an object
         const note = await updateNote(args.project_id, args.issue_iid, args.note_id, args.body);
         return { content: [{ type: "text", text: JSON.stringify(note, null, 2) }] };
       }

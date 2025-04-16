@@ -1,6 +1,6 @@
 {
   "name": "@piatra-open-source/gitlab-mcp-server",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "MCP server for using the GitLab API with enhanced functionality, issues management, time tracking, comments, and improved error handling",
   "license": "MIT",
   "author": "Piatra Open Source (https://gitlab.com/piatra-automation)",

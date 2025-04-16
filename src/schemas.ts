@@ -472,8 +472,8 @@ export const GetNotesSchema = ProjectParamsSchema.extend({
 export const CreateNoteSchema = ProjectParamsSchema.extend({
   issue_iid: z.number().or(z.string())
     .describe("The internal ID of the project issue"),
-  body: z.string().nullable()
-    .describe("The content of the note")
+  body: z.union([z.string(), z.record(z.any())]).nullable()
+    .describe("The content of the note - can be a string or a JSON object")
 });
 
 // Update a note
@@ -482,8 +482,8 @@ export const UpdateNoteSchema = ProjectParamsSchema.extend({
     .describe("The internal ID of the project issue"),
   note_id: z.number().or(z.string())
     .describe("The ID of the note"),
-  body: z.string().nullable()
-    .describe("The content of the note")
+  body: z.union([z.string(), z.record(z.any())]).nullable()
+    .describe("The content of the note - can be a string or a JSON object")
 });
 
 // Delete a note
