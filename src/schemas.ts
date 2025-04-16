@@ -114,7 +114,7 @@ export const CreateRepositoryOptionsSchema = z.object({
 
 export const CreateIssueOptionsSchema = z.object({
   title: z.string(),
-  description: z.string().optional(), // Changed from body to match GitLab API
+  description: z.string().nullable().optional(), // Changed from body to match GitLab API
   assignee_ids: z.array(z.number()).optional(), // Changed from assignees to match GitLab API
   milestone_id: z.number().optional(), // Changed from milestone to match GitLab API
   labels: z.array(z.string()).optional()
@@ -122,7 +122,7 @@ export const CreateIssueOptionsSchema = z.object({
 
 export const CreateMergeRequestOptionsSchema = z.object({ // Changed from CreatePullRequestOptionsSchema
   title: z.string(),
-  description: z.string().optional(), // Changed from body to match GitLab API
+  description: z.string().nullable().optional(), // Changed from body to match GitLab API
   source_branch: z.string(), // Changed from head to match GitLab API
   target_branch: z.string(), // Changed from base to match GitLab API
   allow_collaboration: z.boolean().optional(), // Changed from maintainer_can_modify to match GitLab API
@@ -164,12 +164,15 @@ export const GitLabForkSchema = GitLabRepositorySchema.extend({
 });
 
 // Issue related schemas
-export const GitLabLabelSchema = z.object({
-  id: z.number(),
-  name: z.string(),
-  color: z.string(),
-  description: z.string().optional()
-});
+export const GitLabLabelSchema = z.union([
+  z.string(),
+  z.object({
+    id: z.number(),
+    name: z.string(),
+    color: z.string(),
+    description: z.string().nullable().optional()
+  })
+]);
 
 export const GitLabUserSchema = z.object({
   username: z.string(), // Changed from login to match GitLab API
@@ -193,7 +196,7 @@ export const GitLabIssueSchema = z.object({
   iid: z.number(), // Added to match GitLab API
   project_id: z.number(), // Added to match GitLab API
   title: z.string(),
-  description: z.string(), // Changed from body to match GitLab API
+  description: z.string().nullable(), // Changed from body to match GitLab API
   state: z.string(),
   author: GitLabUserSchema,
   assignees: z.array(GitLabUserSchema),
@@ -217,7 +220,7 @@ export const GitLabMergeRequestSchema = z.object({
   iid: z.number(), // Added to match GitLab API
   project_id: z.number(), // Added to match GitLab API
   title: z.string(),
-  description: z.string(), // Changed from body to match GitLab API
+  description: z.string().nullable(), // Changed from body to match GitLab API
   state: z.string(),
   merged: z.boolean().optional(),
   author: GitLabUserSchema,
@@ -343,46 +346,46 @@ export type GitLabSearchResponse = z.infer<typeof GitLabSearchResponseSchema>;
 export type DeleteProject = z.infer<typeof DeleteProjectSchema>;
 export type UpdateProject = z.infer<typeof UpdateProjectSchema>;
 
-// Time tracking schemas
+// Issue related schemas for time tracking
 export const GitLabTimeStatsSchema = z.object({
-  time_estimate: z.number().describe("Estimated time in seconds"),
-  total_time_spent: z.number().describe("Time spent in seconds"),
-  human_time_estimate: z.string().nullable().describe("Human-readable time estimate"),
-  human_total_time_spent: z.string().nullable().describe("Human-readable time spent")
+  time_estimate: z.number().nullable().optional().describe("Estimated time in seconds"),
+  total_time_spent: z.number().nullable().optional().describe("Time spent in seconds"),
+  human_time_estimate: z.string().nullable().optional().describe("Human-readable time estimate"),
+  human_total_time_spent: z.string().nullable().optional().describe("Human-readable time spent")
 });
 
 // System note metadata schemas
 export const GitLabSystemNoteMetadataSchema = z.object({
-  action: z.string().optional(),
-  created_at: z.string().optional(),
-  updated_at: z.string().optional()
+  action: z.string().optional().nullable(),
+  created_at: z.string().optional().nullable(),
+  updated_at: z.string().optional().nullable()
 });
 
 // Note schema
 export const GitLabNoteSchema = z.object({
   id: z.number(),
   author: GitLabUserSchema,
-  body: z.string(),
+  body: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
-  system: z.boolean(),
-  noteable_id: z.number(),
-  noteable_type: z.string(),
-  noteable_iid: z.number(),
-  position: z.object({}).optional(),
-  resolvable: z.boolean().optional(),
-  resolved: z.boolean().optional(),
+  system: z.boolean().optional().nullable(),
+  noteable_id: z.number().optional().nullable(),
+  noteable_type: z.string().optional().nullable(),
+  noteable_iid: z.number().optional().nullable(),
+  position: z.object({}).optional().nullable(),
+  resolvable: z.boolean().optional().nullable(),
+  resolved: z.boolean().optional().nullable(),
   resolved_by: GitLabUserSchema.nullable().optional(),
-  system_note_metadata: GitLabSystemNoteMetadataSchema.optional()
+  system_note_metadata: GitLabSystemNoteMetadataSchema.optional().nullable()
 });
 
 // Enhance issue schema to include time tracking stats
 export const GitLabEnhancedIssueSchema = GitLabIssueSchema.extend({
-  time_stats: GitLabTimeStatsSchema.optional(),
+  time_stats: GitLabTimeStatsSchema.optional().nullable(),
   task_completion_status: z.object({
-    count: z.number(),
-    completed_count: z.number()
-  }).optional()
+    count: z.number().optional().nullable(),
+    completed_count: z.number().optional().nullable()
+  }).optional().nullable()
 });
 
 // API Operation Parameter Schemas for issues and time tracking
@@ -469,7 +472,7 @@ export const GetNotesSchema = ProjectParamsSchema.extend({
 export const CreateNoteSchema = ProjectParamsSchema.extend({
   issue_iid: z.number().or(z.string())
     .describe("The internal ID of the project issue"),
-  body: z.string()
+  body: z.string().nullable()
     .describe("The content of the note")
 });
 
@@ -479,7 +482,7 @@ export const UpdateNoteSchema = ProjectParamsSchema.extend({
     .describe("The internal ID of the project issue"),
   note_id: z.number().or(z.string())
     .describe("The ID of the note"),
-  body: z.string()
+  body: z.string().nullable()
     .describe("The content of the note")
 });
 

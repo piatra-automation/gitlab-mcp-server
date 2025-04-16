@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2025-04-16
+
+### Fixed
+- Schema validation issues when handling GitLab API responses:
+  - Fixed handling of labels that can be strings or objects
+  - Made description fields nullable to match actual API responses
+  - Made time tracking fields nullable and optional
+  - Improved note schema to handle various response formats
+  - Fixed system note metadata handling for edge cases
+
 ## [1.1.0] - 2025-04-16
 
 ### Added
