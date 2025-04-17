@@ -494,7 +494,117 @@ export const DeleteNoteSchema = ProjectParamsSchema.extend({
     .describe("The ID of the note")
 });
 
+// Issue update schema
+export const UpdateIssueSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue"),
+  title: z.string().optional()
+    .describe("Updated issue title"),
+  description: z.string().optional()
+    .describe("Updated issue description"),
+  state_event: z.enum(['close', 'reopen']).optional()
+    .describe("Status change action"),
+  labels: z.string().optional()
+    .describe("Comma-separated list of labels"),
+  assignee_ids: z.array(z.number()).optional()
+    .describe("Array of user IDs to assign"),
+  milestone_id: z.number().optional()
+    .describe("ID of milestone to assign"),
+  due_date: z.string().optional()
+    .describe("Due date in YYYY-MM-DD format")
+});
+
+// Schema for state management endpoints
+export const IssueStateUpdateSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue")
+});
+
+// Label management schemas
+export const GetProjectLabelsSchema = ProjectParamsSchema.extend({});
+
+export const CreateProjectLabelSchema = ProjectParamsSchema.extend({
+  name: z.string().describe("Label name"),
+  color: z.string().describe("Label color (hex code)"),
+  description: z.string().optional().describe("Label description")
+});
+
+export const UpdateProjectLabelSchema = ProjectParamsSchema.extend({
+  label_id: z.number().or(z.string()).describe("Label ID"),
+  new_name: z.string().optional().describe("New label name"),
+  color: z.string().optional().describe("New color"),
+  description: z.string().optional().describe("New description")
+});
+
+export const DeleteProjectLabelSchema = ProjectParamsSchema.extend({
+  label_id: z.number().or(z.string()).describe("Label ID")
+});
+
+// Label management on issues
+export const ManageIssueLabelsSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string()).describe("The internal ID of the project issue"),
+  labels: z.array(z.string()).describe("Array of label names to add/remove")
+});
+
+// Milestone management schemas
+export const GetProjectMilestonesSchema = ProjectParamsSchema.extend({
+  state: z.enum(['active', 'closed']).optional()
+    .describe("Filter by state ('active', 'closed')")
+});
+
+export const CreateProjectMilestoneSchema = ProjectParamsSchema.extend({
+  title: z.string().describe("Milestone title"),
+  description: z.string().optional().describe("Milestone description"),
+  due_date: z.string().optional().describe("Due date in YYYY-MM-DD format"),
+  start_date: z.string().optional().describe("Start date in YYYY-MM-DD format")
+});
+
+// User assignment schemas
+export const AssignIssueSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue"),
+  assignee_ids: z.array(z.number())
+    .describe("Array of user IDs to assign")
+});
+
+export const UnassignIssueSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue")
+});
+
+// Issue relationship schemas
+export const CreateIssueLinkSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue"),
+  target_project_id: z.string()
+    .describe("Target project identifier"),
+  target_issue_iid: z.number().or(z.string())
+    .describe("Target issue internal ID"),
+  link_type: z.string().optional()
+    .describe("Type of relationship ('relates_to', 'blocks', etc.)")
+});
+
+export const DeleteIssueLinkSchema = ProjectParamsSchema.extend({
+  issue_iid: z.number().or(z.string())
+    .describe("The internal ID of the project issue"),
+  link_id: z.number().or(z.string())
+    .describe("ID of the link to remove")
+});
+
 // Export types
 export type GitLabTimeStats = z.infer<typeof GitLabTimeStatsSchema>;
 export type GitLabNote = z.infer<typeof GitLabNoteSchema>;
 export type GitLabEnhancedIssue = z.infer<typeof GitLabEnhancedIssueSchema>;
+export type UpdateIssue = z.infer<typeof UpdateIssueSchema>;
+export type IssueStateUpdate = z.infer<typeof IssueStateUpdateSchema>;
+export type GetProjectLabels = z.infer<typeof GetProjectLabelsSchema>;
+export type CreateProjectLabel = z.infer<typeof CreateProjectLabelSchema>;
+export type UpdateProjectLabel = z.infer<typeof UpdateProjectLabelSchema>;
+export type DeleteProjectLabel = z.infer<typeof DeleteProjectLabelSchema>;
+export type ManageIssueLabels = z.infer<typeof ManageIssueLabelsSchema>;
+export type GetProjectMilestones = z.infer<typeof GetProjectMilestonesSchema>;
+export type CreateProjectMilestone = z.infer<typeof CreateProjectMilestoneSchema>;
+export type AssignIssue = z.infer<typeof AssignIssueSchema>;
+export type UnassignIssue = z.infer<typeof UnassignIssueSchema>;
+export type CreateIssueLink = z.infer<typeof CreateIssueLinkSchema>;
+export type DeleteIssueLink = z.infer<typeof DeleteIssueLinkSchema>;

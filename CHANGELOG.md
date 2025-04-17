@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2025-04-17
+
+### Added
+- Issue management endpoints
+  - `update_issue`: Update various issue attributes
+  - `close_issue`: Dedicated method to close an issue
+  - `reopen_issue`: Dedicated method to reopen a closed issue
+- Label management functionality
+  - `get_project_labels`: Retrieve all labels for a project
+  - `create_project_label`: Create a new label for a project
+  - `update_project_label`: Update an existing label
+  - `delete_project_label`: Delete a label from a project
+  - `add_labels_to_issue`: Add specific labels to an issue
+  - `remove_labels_from_issue`: Remove specific labels from an issue
+- Milestone management functionality
+  - `get_project_milestones`: Retrieve all milestones for a project
+  - `create_project_milestone`: Create a new milestone for a project
+- User assignment endpoints
+  - `assign_issue`: Assign users to an issue
+  - `unassign_issue`: Remove all assignees from an issue
+- Issue relationships endpoints
+  - `create_issue_link`: Create a link between two issues
+  - `delete_issue_link`: Remove a link between issues
+
+### Changed
+- Updated README with comprehensive documentation of new features
+- Enhanced examples covering all new functionality
+- Added new keywords to package.json
+
 ## [1.1.2] - 2025-04-16
 
 ### Fixed
