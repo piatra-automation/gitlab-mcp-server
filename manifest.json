@@ -1,0 +1,192 @@
+{
+  "dxt_version": "0.1",
+  "name": "gitlab-mcp-server",
+  "version": "1.3.0",
+  "description": "MCP server for comprehensive GitLab API integration with repository management, issues, time tracking, and more",
+  "author": {
+    "name": "Piatra Open Source",
+    "url": "https://gitlab.com/piatra-automation"
+  },
+  "display_name": "GitLab MCP Server",
+  "long_description": "A Model Context Protocol (MCP) server that enables AI assistants to interact with GitLab repositories. Features include:\n\n- **Repository Management**: Create, update, delete, and fork projects\n- **File Operations**: Read, create, update files and commit changes\n- **Issue Management**: Create, update, close issues with time tracking\n- **Comments & Notes**: Manage issue comments\n- **Labels & Milestones**: Full label and milestone management\n- **User Assignment**: Assign and unassign users to issues\n- **Issue Relationships**: Create and manage issue links\n\nSupports both gitlab.com and self-hosted GitLab instances.",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.com/piatra-automation/gitlab-mcp-server.git"
+  },
+  "homepage": "https://gitlab.com/piatra-automation/gitlab-mcp-server",
+  "documentation": "https://gitlab.com/piatra-automation/gitlab-mcp-server/-/blob/main/README.md",
+  "support": "https://gitlab.com/piatra-automation/gitlab-mcp-server/-/issues",
+  "license": "MIT",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["dist/index.js"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "create_repository",
+      "description": "Create a new GitLab project"
+    },
+    {
+      "name": "update_project",
+      "description": "Update project settings including visibility"
+    },
+    {
+      "name": "delete_project",
+      "description": "Delete a GitLab project"
+    },
+    {
+      "name": "search_repositories",
+      "description": "Search for GitLab projects"
+    },
+    {
+      "name": "get_file_contents",
+      "description": "Get file or directory contents"
+    },
+    {
+      "name": "create_or_update_file",
+      "description": "Create or update a single file"
+    },
+    {
+      "name": "push_files",
+      "description": "Commit multiple files at once"
+    },
+    {
+      "name": "create_branch",
+      "description": "Create a new branch"
+    },
+    {
+      "name": "fork_repository",
+      "description": "Fork a project"
+    },
+    {
+      "name": "create_issue",
+      "description": "Create a new issue"
+    },
+    {
+      "name": "create_merge_request",
+      "description": "Create a new merge request"
+    },
+    {
+      "name": "get_issues",
+      "description": "Get issues with filtering options"
+    },
+    {
+      "name": "get_issue",
+      "description": "Get a single issue with details"
+    },
+    {
+      "name": "update_issue",
+      "description": "Update issue attributes"
+    },
+    {
+      "name": "close_issue",
+      "description": "Close an issue"
+    },
+    {
+      "name": "reopen_issue",
+      "description": "Reopen a closed issue"
+    },
+    {
+      "name": "get_issue_time_stats",
+      "description": "Get time tracking statistics"
+    },
+    {
+      "name": "set_time_estimate",
+      "description": "Set time estimate for an issue"
+    },
+    {
+      "name": "add_spent_time",
+      "description": "Add spent time to an issue"
+    },
+    {
+      "name": "get_notes",
+      "description": "Get comments for an issue"
+    },
+    {
+      "name": "create_note",
+      "description": "Create a comment on an issue"
+    },
+    {
+      "name": "update_note",
+      "description": "Update an existing comment"
+    },
+    {
+      "name": "delete_note",
+      "description": "Delete a comment"
+    },
+    {
+      "name": "get_project_labels",
+      "description": "Get all project labels"
+    },
+    {
+      "name": "create_project_label",
+      "description": "Create a new label"
+    },
+    {
+      "name": "add_labels_to_issue",
+      "description": "Add labels to an issue"
+    },
+    {
+      "name": "get_project_milestones",
+      "description": "Get project milestones"
+    },
+    {
+      "name": "create_project_milestone",
+      "description": "Create a new milestone"
+    },
+    {
+      "name": "assign_issue",
+      "description": "Assign users to an issue"
+    },
+    {
+      "name": "create_issue_link",
+      "description": "Link two issues together"
+    }
+  ],
+  "keywords": [
+    "gitlab",
+    "git",
+    "repository",
+    "version-control",
+    "issues",
+    "merge-requests",
+    "ci-cd",
+    "devops",
+    "project-management",
+    "collaboration"
+  ],
+  "compatibility": {
+    "mcp_version": ">=1.0.0",
+    "clients": {
+      "claude": ">=1.0.0"
+    },
+    "platforms": ["darwin", "linux", "win32"],
+    "node_version": ">=18.0.0"
+  },
+  "user_config": {
+    "gitlab_personal_access_token": {
+      "title": "GitLab Personal Access Token",
+      "type": "string",
+      "description": "Your GitLab personal access token with API access",
+      "required": true,
+      "sensitive": true,
+      "env_var": "GITLAB_PERSONAL_ACCESS_TOKEN"
+    },
+    "gitlab_api_url": {
+      "title": "GitLab API URL",
+      "type": "string",
+      "description": "GitLab API URL (defaults to https://gitlab.com/api/v4)",
+      "default": "https://gitlab.com/api/v4",
+      "required": false,
+      "env_var": "GITLAB_API_URL"
+    }
+  }
+}

@@ -5,6 +5,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ErrorCode,
+  McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import fetch from "node-fetch";
 import type { Response } from './types.js';
@@ -78,9 +80,38 @@ import {
   type IssueStateUpdate,
 } from './schemas.js';
 
+// Logger utility for DXT debugging
+class Logger {
+  private debugMode: boolean;
+
+  constructor() {
+    this.debugMode = process.env.DXT_DEBUG === 'true' || process.env.DEBUG === 'true';
+  }
+
+  debug(message: string, data?: any) {
+    if (this.debugMode) {
+      console.error(`[DXT-GitLab] DEBUG: ${message}`, data ? JSON.stringify(data, null, 2) : '');
+    }
+  }
+
+  info(message: string) {
+    console.error(`[DXT-GitLab] INFO: ${message}`);
+  }
+
+  error(message: string, error?: any) {
+    console.error(`[DXT-GitLab] ERROR: ${message}`, error);
+  }
+
+  warn(message: string) {
+    console.error(`[DXT-GitLab] WARN: ${message}`);
+  }
+}
+
+const logger = new Logger();
+
 const server = new Server({
   name: "gitlab-mcp-server",
-  version: "1.2.0",
+  version: "1.3.0",
 }, {
   capabilities: {
     tools: {}
@@ -91,8 +122,23 @@ const GITLAB_PERSONAL_ACCESS_TOKEN = process.env.GITLAB_PERSONAL_ACCESS_TOKEN;
 const GITLAB_API_URL = process.env.GITLAB_API_URL || 'https://gitlab.com/api/v4';
 
 if (!GITLAB_PERSONAL_ACCESS_TOKEN) {
-  console.error("GITLAB_PERSONAL_ACCESS_TOKEN environment variable is not set");
+  logger.error("GITLAB_PERSONAL_ACCESS_TOKEN environment variable is not set");
+  logger.info("Please set your GitLab personal access token in the environment or through the DXT configuration");
   process.exit(1);
+}
+
+logger.info(`GitLab MCP Server starting with API URL: ${GITLAB_API_URL}`);
+
+/**
+ * Enhanced timeout wrapper for API requests
+ */
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 30000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs)
+    )
+  ]);
 }
 
 /**
@@ -101,6 +147,64 @@ if (!GITLAB_PERSONAL_ACCESS_TOKEN) {
  */
 function encodeGitLabPath(filePath: string): string {
   return encodeURIComponent(filePath).replace(/%2F/g, '/');
+}
+
+/**
+ * Enhanced API request wrapper with retry logic
+ */
+async function makeGitLabRequest(
+  url: string,
+  options: any = {},
+  retries: number = 3
+): Promise<any> {
+  const headers = {
+    'Authorization': `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`,
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+
+  logger.debug(`Making GitLab API request to: ${url}`, { method: options.method || 'GET' });
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response: Response = await withTimeout(
+        fetch(url, {
+          ...options,
+          headers
+        }),
+        30000
+      );
+
+      if (!response.ok) {
+        let errorMessage = `GitLab API error (${response.status}): ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage += ` - ${JSON.stringify(errorData)}`;
+        } catch {}
+        
+        if (response.status === 429 && attempt < retries) {
+          // Rate limited - wait and retry
+          const retryAfter = parseInt(response.headers.get('retry-after') || '60');
+          logger.warn(`Rate limited. Waiting ${retryAfter}s before retry ${attempt}/${retries}`);
+          await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+          continue;
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      logger.debug(`GitLab API response received`, { status: response.status });
+      return data;
+    } catch (error) {
+      if (attempt === retries) {
+        logger.error(`GitLab API request failed after ${retries} attempts`, error);
+        throw error;
+      }
+      logger.warn(`Request attempt ${attempt} failed, retrying...`);
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+    }
+  }
 }
 
 /**
@@ -206,7 +310,7 @@ async function getFileContents(
 ): Promise<GitLabContent> {
   // Check for potentially problematic file paths
   if (filePath.includes('#') || filePath.includes('?') || filePath.includes('[') || filePath.includes(']')) {
-    console.warn(`Warning: File path '${filePath}' contains special characters that may cause issues with GitLab API. Consider renaming the file.`);
+    logger.warn(`File path '${filePath}' contains special characters that may cause issues with GitLab API. Consider renaming the file.`);
   }
   
   // Ensure file path is properly encoded
@@ -1430,27 +1534,31 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+  
+  logger.debug(`Tool called: ${name}`, args);
+
   try {
-    if (!request.params.arguments) {
-      throw new Error("Arguments are required");
+    if (!args) {
+      throw new McpError(ErrorCode.InvalidParams, "Arguments are required");
     }
 
-    switch (request.params.name) {
+    switch (name) {
       case "fork_repository": {
-        const args = ForkRepositorySchema.parse(request.params.arguments);
-        const fork = await forkProject(args.project_id, args.namespace);
+        const validatedArgs = ForkRepositorySchema.parse(args);
+        const fork = await forkProject(validatedArgs.project_id, validatedArgs.namespace);
         return { content: [{ type: "text", text: JSON.stringify(fork, null, 2) }] };
       }
 
       case "create_branch": {
-        const args = CreateBranchSchema.parse(request.params.arguments);
-        let ref = args.ref;
+        const validatedArgs = CreateBranchSchema.parse(args);
+        let ref = validatedArgs.ref;
         if (!ref) {
-          ref = await getDefaultBranchRef(args.project_id);
+          ref = await getDefaultBranchRef(validatedArgs.project_id);
         }
 
-        const branch = await createBranch(args.project_id, {
-          name: args.branch,
+        const branch = await createBranch(validatedArgs.project_id, {
+          name: validatedArgs.branch,
           ref
         });
 
@@ -1458,268 +1566,311 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "search_repositories": {
-        const args = SearchRepositoriesSchema.parse(request.params.arguments);
-        const results = await searchProjects(args.search, args.page, args.per_page);
+        const validatedArgs = SearchRepositoriesSchema.parse(args);
+        const results = await searchProjects(validatedArgs.search, validatedArgs.page, validatedArgs.per_page);
         return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
       }
 
       case "create_repository": {
-        const args = CreateRepositorySchema.parse(request.params.arguments);
-        const repository = await createRepository(args);
+        const validatedArgs = CreateRepositorySchema.parse(args);
+        const repository = await createRepository(validatedArgs);
         return { content: [{ type: "text", text: JSON.stringify(repository, null, 2) }] };
       }
 
       case "get_file_contents": {
-        const args = GetFileContentsSchema.parse(request.params.arguments);
-        const contents = await getFileContents(args.project_id, args.file_path, args.ref);
+        const validatedArgs = GetFileContentsSchema.parse(args);
+        const contents = await getFileContents(validatedArgs.project_id, validatedArgs.file_path, validatedArgs.ref);
         return { content: [{ type: "text", text: JSON.stringify(contents, null, 2) }] };
       }
 
       case "create_or_update_file": {
-        const args = CreateOrUpdateFileSchema.parse(request.params.arguments);
+        const validatedArgs = CreateOrUpdateFileSchema.parse(args);
         const result = await createOrUpdateFile(
-          args.project_id,
-          args.file_path,
-          args.content,
-          args.commit_message,
-          args.branch,
-          args.previous_path
+          validatedArgs.project_id,
+          validatedArgs.file_path,
+          validatedArgs.content,
+          validatedArgs.commit_message,
+          validatedArgs.branch,
+          validatedArgs.previous_path
         );
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
 
       case "push_files": {
-        const args = PushFilesSchema.parse(request.params.arguments);
+        const validatedArgs = PushFilesSchema.parse(args);
         const result = await createCommit(
-          args.project_id,
-          args.commit_message,
-          args.branch,
-          args.files.map(f => ({ path: f.file_path, content: f.content }))
+          validatedArgs.project_id,
+          validatedArgs.commit_message,
+          validatedArgs.branch,
+          validatedArgs.files.map(f => ({ path: f.file_path, content: f.content }))
         );
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
 
       case "create_issue": {
-        const args = CreateIssueSchema.parse(request.params.arguments);
-        const { project_id, ...options } = args;
+        const validatedArgs = CreateIssueSchema.parse(args);
+        const { project_id, ...options } = validatedArgs;
         const issue = await createIssue(project_id, options);
         return { content: [{ type: "text", text: JSON.stringify(issue, null, 2) }] };
       }
 
       case "create_merge_request": {
-        const args = CreateMergeRequestSchema.parse(request.params.arguments);
-        const { project_id, ...options } = args;
+        const validatedArgs = CreateMergeRequestSchema.parse(args);
+        const { project_id, ...options } = validatedArgs;
         const mergeRequest = await createMergeRequest(project_id, options);
         return { content: [{ type: "text", text: JSON.stringify(mergeRequest, null, 2) }] };
       }
 
       case "delete_project": {
-        const args = DeleteProjectSchema.parse(request.params.arguments);
-        const result = await deleteProject(args.project_id);
+        const validatedArgs = DeleteProjectSchema.parse(args);
+        const result = await deleteProject(validatedArgs.project_id);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
 
       case "update_project": {
-        const args = UpdateProjectSchema.parse(request.params.arguments);
-        const { project_id, ...options } = args;
+        const validatedArgs = UpdateProjectSchema.parse(args);
+        const { project_id, ...options } = validatedArgs;
         const result = await updateProject(project_id, options);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
 
       // New cases for issues and time tracking
       case "get_issues": {
-        const args = GetIssuesSchema.parse(request.params.arguments);
-        const { project_id, ...options } = args;
+        const validatedArgs = GetIssuesSchema.parse(args);
+        const { project_id, ...options } = validatedArgs;
         const issues = await getIssues(project_id, options);
         return { content: [{ type: "text", text: JSON.stringify(issues, null, 2) }] };
       }
       
       case "get_issue": {
-        const args = GetIssueSchema.parse(request.params.arguments);
-        const issue = await getIssue(args.project_id, args.issue_iid, args.with_time_stats);
+        const validatedArgs = GetIssueSchema.parse(args);
+        const issue = await getIssue(validatedArgs.project_id, validatedArgs.issue_iid, validatedArgs.with_time_stats);
         return { content: [{ type: "text", text: JSON.stringify(issue, null, 2) }] };
       }
       
       case "get_issue_time_stats": {
-        const args = GetTimeStatsSchema.parse(request.params.arguments);
-        const timeStats = await getIssueTimeStats(args.project_id, args.issue_iid);
+        const validatedArgs = GetTimeStatsSchema.parse(args);
+        const timeStats = await getIssueTimeStats(validatedArgs.project_id, validatedArgs.issue_iid);
         return { content: [{ type: "text", text: JSON.stringify(timeStats, null, 2) }] };
       }
       
       case "set_time_estimate": {
-        const args = TimeTrackingSchema.parse(request.params.arguments);
-        const result = await setTimeEstimate(args.project_id, args.issue_iid, args.duration);
+        const validatedArgs = TimeTrackingSchema.parse(args);
+        const result = await setTimeEstimate(validatedArgs.project_id, validatedArgs.issue_iid, validatedArgs.duration);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "reset_time_estimate": {
-        const args = GetTimeStatsSchema.parse(request.params.arguments);
-        const result = await resetTimeEstimate(args.project_id, args.issue_iid);
+        const validatedArgs = GetTimeStatsSchema.parse(args);
+        const result = await resetTimeEstimate(validatedArgs.project_id, validatedArgs.issue_iid);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "add_spent_time": {
-        const args = TimeTrackingSchema.parse(request.params.arguments);
-        const result = await addSpentTime(args.project_id, args.issue_iid, args.duration);
+        const validatedArgs = TimeTrackingSchema.parse(args);
+        const result = await addSpentTime(validatedArgs.project_id, validatedArgs.issue_iid, validatedArgs.duration);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "reset_spent_time": {
-        const args = GetTimeStatsSchema.parse(request.params.arguments);
-        const result = await resetSpentTime(args.project_id, args.issue_iid);
+        const validatedArgs = GetTimeStatsSchema.parse(args);
+        const result = await resetSpentTime(validatedArgs.project_id, validatedArgs.issue_iid);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       // Cases for notes (comments)
       case "get_notes": {
-        const args = GetNotesSchema.parse(request.params.arguments);
-        const { project_id, issue_iid, ...options } = args;
+        const validatedArgs = GetNotesSchema.parse(args);
+        const { project_id, issue_iid, ...options } = validatedArgs;
         const notes = await getNotes(project_id, issue_iid, options);
         return { content: [{ type: "text", text: JSON.stringify(notes, null, 2) }] };
       }
       
       case "create_note": {
-        const args = CreateNoteSchema.parse(request.params.arguments);
+        const validatedArgs = CreateNoteSchema.parse(args);
         // Note: body can now be a string or an object
-        const note = await createNote(args.project_id, args.issue_iid, args.body);
+        const note = await createNote(validatedArgs.project_id, validatedArgs.issue_iid, validatedArgs.body);
         return { content: [{ type: "text", text: JSON.stringify(note, null, 2) }] };
       }
       
       case "update_note": {
-        const args = UpdateNoteSchema.parse(request.params.arguments);
+        const validatedArgs = UpdateNoteSchema.parse(args);
         // Note: body can now be a string or an object
-        const note = await updateNote(args.project_id, args.issue_iid, args.note_id, args.body);
+        const note = await updateNote(validatedArgs.project_id, validatedArgs.issue_iid, validatedArgs.note_id, validatedArgs.body);
         return { content: [{ type: "text", text: JSON.stringify(note, null, 2) }] };
       }
       
       case "delete_note": {
-        const args = DeleteNoteSchema.parse(request.params.arguments);
-        const result = await deleteNote(args.project_id, args.issue_iid, args.note_id);
+        const validatedArgs = DeleteNoteSchema.parse(args);
+        const result = await deleteNote(validatedArgs.project_id, validatedArgs.issue_iid, validatedArgs.note_id);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       // New cases for issue management
       case "update_issue": {
-        const args = UpdateIssueSchema.parse(request.params.arguments);
-        const { project_id, issue_iid, ...options } = args;
+        const validatedArgs = UpdateIssueSchema.parse(args);
+        const { project_id, issue_iid, ...options } = validatedArgs;
         const result = await updateIssue(project_id, issue_iid, options);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "close_issue": {
-        const args = IssueStateUpdateSchema.parse(request.params.arguments);
-        const result = await closeIssue(args.project_id, args.issue_iid);
+        const validatedArgs = IssueStateUpdateSchema.parse(args);
+        const result = await closeIssue(validatedArgs.project_id, validatedArgs.issue_iid);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "reopen_issue": {
-        const args = IssueStateUpdateSchema.parse(request.params.arguments);
-        const result = await reopenIssue(args.project_id, args.issue_iid);
+        const validatedArgs = IssueStateUpdateSchema.parse(args);
+        const result = await reopenIssue(validatedArgs.project_id, validatedArgs.issue_iid);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       // Label management cases
       case "get_project_labels": {
-        const args = GetProjectLabelsSchema.parse(request.params.arguments);
-        const result = await getProjectLabels(args.project_id);
+        const validatedArgs = GetProjectLabelsSchema.parse(args);
+        const result = await getProjectLabels(validatedArgs.project_id);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "create_project_label": {
-        const args = CreateProjectLabelSchema.parse(request.params.arguments);
-        const result = await createProjectLabel(args.project_id, args.name, args.color, args.description);
+        const validatedArgs = CreateProjectLabelSchema.parse(args);
+        const result = await createProjectLabel(validatedArgs.project_id, validatedArgs.name, validatedArgs.color, validatedArgs.description);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "update_project_label": {
-        const args = UpdateProjectLabelSchema.parse(request.params.arguments);
-        const { project_id, label_id, ...options } = args;
+        const validatedArgs = UpdateProjectLabelSchema.parse(args);
+        const { project_id, label_id, ...options } = validatedArgs;
         const result = await updateProjectLabel(project_id, label_id, options);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "delete_project_label": {
-        const args = DeleteProjectLabelSchema.parse(request.params.arguments);
-        const result = await deleteProjectLabel(args.project_id, args.label_id);
+        const validatedArgs = DeleteProjectLabelSchema.parse(args);
+        const result = await deleteProjectLabel(validatedArgs.project_id, validatedArgs.label_id);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "add_labels_to_issue": {
-        const args = ManageIssueLabelsSchema.parse(request.params.arguments);
-        const result = await addLabelsToIssue(args.project_id, args.issue_iid, args.labels);
+        const validatedArgs = ManageIssueLabelsSchema.parse(args);
+        const result = await addLabelsToIssue(validatedArgs.project_id, validatedArgs.issue_iid, validatedArgs.labels);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "remove_labels_from_issue": {
-        const args = ManageIssueLabelsSchema.parse(request.params.arguments);
-        const result = await removeLabelsFromIssue(args.project_id, args.issue_iid, args.labels);
+        const validatedArgs = ManageIssueLabelsSchema.parse(args);
+        const result = await removeLabelsFromIssue(validatedArgs.project_id, validatedArgs.issue_iid, validatedArgs.labels);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       // Milestone management cases
       case "get_project_milestones": {
-        const args = GetProjectMilestonesSchema.parse(request.params.arguments);
-        const result = await getProjectMilestones(args.project_id, args.state);
+        const validatedArgs = GetProjectMilestonesSchema.parse(args);
+        const result = await getProjectMilestones(validatedArgs.project_id, validatedArgs.state);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "create_project_milestone": {
-        const args = CreateProjectMilestoneSchema.parse(request.params.arguments);
-        const { project_id, title, description, due_date, start_date } = args;
+        const validatedArgs = CreateProjectMilestoneSchema.parse(args);
+        const { project_id, title, description, due_date, start_date } = validatedArgs;
         const result = await createProjectMilestone(project_id, title, description, due_date, start_date);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       // User assignment cases
       case "assign_issue": {
-        const args = AssignIssueSchema.parse(request.params.arguments);
-        const result = await assignIssue(args.project_id, args.issue_iid, args.assignee_ids);
+        const validatedArgs = AssignIssueSchema.parse(args);
+        const result = await assignIssue(validatedArgs.project_id, validatedArgs.issue_iid, validatedArgs.assignee_ids);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "unassign_issue": {
-        const args = UnassignIssueSchema.parse(request.params.arguments);
-        const result = await unassignIssue(args.project_id, args.issue_iid);
+        const validatedArgs = UnassignIssueSchema.parse(args);
+        const result = await unassignIssue(validatedArgs.project_id, validatedArgs.issue_iid);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       // Issue relationships cases
       case "create_issue_link": {
-        const args = CreateIssueLinkSchema.parse(request.params.arguments);
+        const validatedArgs = CreateIssueLinkSchema.parse(args);
         const result = await createIssueLink(
-          args.project_id,
-          args.issue_iid,
-          args.target_project_id,
-          args.target_issue_iid,
-          args.link_type
+          validatedArgs.project_id,
+          validatedArgs.issue_iid,
+          validatedArgs.target_project_id,
+          validatedArgs.target_issue_iid,
+          validatedArgs.link_type
         );
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       
       case "delete_issue_link": {
-        const args = DeleteIssueLinkSchema.parse(request.params.arguments);
-        const result = await deleteIssueLink(args.project_id, args.issue_iid, args.link_id);
+        const validatedArgs = DeleteIssueLinkSchema.parse(args);
+        const result = await deleteIssueLink(validatedArgs.project_id, validatedArgs.issue_iid, validatedArgs.link_id);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
 
       default:
-        throw new Error(`Unknown tool: ${request.params.name}`);
+        throw new McpError(
+          ErrorCode.MethodNotFound,
+          `Tool not found: ${name}`
+        );
     }
   } catch (error) {
+    logger.error(`Tool execution failed: ${name}`, error);
+    
     if (error instanceof z.ZodError) {
-      throw new Error(`Invalid arguments: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Invalid parameters: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+      );
     }
-    throw error;
+    
+    if (error instanceof McpError) {
+      throw error;
+    }
+    
+    throw new McpError(
+      ErrorCode.InternalError,
+      `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 });
 
-async function runServer() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("GitLab MCP Server running on stdio");
+async function main() {
+  try {
+    const transport = new StdioServerTransport();
+    
+    // Set up graceful shutdown
+    process.on('SIGINT', async () => {
+      logger.info('Shutting down GitLab MCP Server...');
+      await server.close();
+      process.exit(0);
+    });
+
+    process.on('SIGTERM', async () => {
+      logger.info('Shutting down GitLab MCP Server...');
+      await server.close();
+      process.exit(0);
+    });
+
+    // Handle uncaught errors
+    process.on('uncaughtException', (error) => {
+      logger.error('Uncaught exception:', error);
+      process.exit(1);
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      logger.error(`Unhandled rejection at: ${promise}, reason: ${reason}`);
+      process.exit(1);
+    });
+
+    await server.connect(transport);
+    logger.info('GitLab MCP Server (DXT) started successfully');
+  } catch (error) {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
+  }
 }
 
-runServer().catch((error) => {
-  console.error("Fatal error in main():", error);
-  process.exit(1);
-});
+main();

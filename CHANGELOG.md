@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2025-07-02
+
+### Added
+- Desktop Extension (DXT) support for easy installation and distribution
+  - Complete DXT manifest with user configuration support
+  - Enhanced error handling with retry logic for rate-limited requests
+  - Comprehensive debug logging with DXT_DEBUG environment variable
+  - Timeout management (30s default) for all API requests
+  - Graceful shutdown handling on SIGINT/SIGTERM signals
+- Production-ready logging system with configurable debug output
+- Automatic retry mechanism for failed API requests (up to 3 attempts)
+- Rate limit handling with automatic backoff
+- Enhanced error messages using MCP error types
+- DXT-specific documentation and setup instructions
+- `.dxtignore` file for optimized packaging
+
+### Changed
+- Refactored server code to include comprehensive error handling
+- Updated all tool handlers to use validated arguments consistently
+- Enhanced API request handling with timeout and retry capabilities
+- Improved startup sequence with proper error handling
+- Updated documentation to include DXT-specific information
+
+### Fixed
+- Improved error handling for all GitLab API operations
+- Better handling of network timeouts and connection issues
+
 ## [1.2.0] - 2025-04-17
 
 ### Added

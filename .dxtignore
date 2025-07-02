@@ -1,0 +1,56 @@
+# DXT ignore file - files and directories to exclude from the extension package
+
+# Development files
+.git/
+.gitignore
+.github/
+.gitlab-ci.yml
+
+# Node modules (will be installed during build)
+node_modules/
+
+# Source files (only dist is needed)
+src/
+tsconfig.json
+
+# Development and test files
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+coverage/
+.nyc_output/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Documentation source files
+docs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Environment files (security)
+.env
+.env.local
+.env.*.local
+
+# Other package managers
+yarn.lock
+pnpm-lock.yaml
