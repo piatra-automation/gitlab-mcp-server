@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2025-09-25
+
+### Added
+- Comprehensive merge request management functionality
+  - `get_merge_requests`: List merge requests with filtering (state, labels, assignee, etc.)
+  - `get_merge_request`: Get detailed information about a specific merge request
+  - `merge_merge_request`: Accept/merge a merge request with options for squash, auto-merge, and source branch deletion
+  - `update_merge_request`: Update MR title, description, assignees, reviewers, labels, and settings
+  - `delete_branch`: Delete branches after merge for cleanup
+  - `approve_merge_request`: Approve a merge request with optional SHA verification
+  - `unapprove_merge_request`: Remove approval from a merge request
+  - `cancel_auto_merge`: Cancel automatic merge when pipeline succeeds
+- Makefile for build automation and npm publishing workflow
+
+### Changed
+- Updated package description to reflect merge request capabilities
+- Enhanced type definitions with comprehensive merge request schemas
+
+## [1.4.0] - 2025-09-25
+
+### Added
+- Initial merge request support (create_merge_request endpoint)
+
 ## [1.3.0] - 2025-07-02
 
 ### Added
