@@ -1,7 +1,7 @@
 {
   "name": "@piatra-open-source/gitlab-mcp-server",
-  "version": "1.3.0",
-  "description": "MCP server for using the GitLab API with comprehensive functionality: repository management, issues, time tracking, comments, labels, milestones, user assignment, and issue relationships",
+  "version": "1.4.0",
+  "description": "MCP server for using the GitLab API with comprehensive functionality: repository management, issues, merge requests (including merge, approve, update), time tracking, comments, labels, milestones, user assignment, and issue relationships",
   "license": "MIT",
   "author": "Piatra Open Source (https://gitlab.com/piatra-automation)",
   "homepage": "https://gitlab.com/piatra-automation/gitlab-mcp-server",

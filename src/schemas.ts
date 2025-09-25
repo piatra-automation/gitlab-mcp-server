@@ -591,6 +591,99 @@ export const DeleteIssueLinkSchema = ProjectParamsSchema.extend({
     .describe("ID of the link to remove")
 });
 
+// Merge Request Management Schemas
+export const GetMergeRequestsSchema = ProjectParamsSchema.extend({
+  state: z.enum(['opened', 'closed', 'locked', 'merged', 'all']).optional()
+    .describe("State of merge requests to retrieve"),
+  order_by: z.enum(['created_at', 'updated_at']).optional()
+    .describe("Order results by created_at or updated_at"),
+  sort: z.enum(['asc', 'desc']).optional()
+    .describe("Sort order"),
+  milestone: z.string().optional()
+    .describe("Milestone title"),
+  labels: z.string().optional()
+    .describe("Comma-separated list of labels"),
+  author_id: z.number().optional()
+    .describe("Author user ID"),
+  assignee_id: z.number().optional()
+    .describe("Assignee user ID"),
+  per_page: z.number().optional()
+    .describe("Number of results per page (default: 20)"),
+  page: z.number().optional()
+    .describe("Page number for pagination (default: 1)")
+});
+
+export const GetMergeRequestSchema = ProjectParamsSchema.extend({
+  merge_request_iid: z.number().or(z.string())
+    .describe("The internal ID of the merge request")
+});
+
+export const MergeMergeRequestSchema = ProjectParamsSchema.extend({
+  merge_request_iid: z.number().or(z.string())
+    .describe("The internal ID of the merge request"),
+  merge_commit_message: z.string().optional()
+    .describe("Custom merge commit message"),
+  squash_commit_message: z.string().optional()
+    .describe("Custom squash commit message"),
+  should_remove_source_branch: z.boolean().optional()
+    .describe("Delete source branch after merge"),
+  merge_when_pipeline_succeeds: z.boolean().optional()
+    .describe("Auto-merge when pipeline succeeds"),
+  squash: z.boolean().optional()
+    .describe("Squash commits into single commit")
+});
+
+export const UpdateMergeRequestSchema = ProjectParamsSchema.extend({
+  merge_request_iid: z.number().or(z.string())
+    .describe("The internal ID of the merge request"),
+  title: z.string().optional()
+    .describe("Title of the merge request"),
+  description: z.string().optional()
+    .describe("Description of the merge request"),
+  target_branch: z.string().optional()
+    .describe("Target branch name"),
+  state_event: z.enum(['close', 'reopen']).optional()
+    .describe("State transition for the merge request"),
+  labels: z.string().optional()
+    .describe("Comma-separated list of labels"),
+  assignee_id: z.number().optional()
+    .describe("Assignee user ID"),
+  assignee_ids: z.array(z.number()).optional()
+    .describe("Array of assignee user IDs"),
+  reviewer_ids: z.array(z.number()).optional()
+    .describe("Array of reviewer user IDs"),
+  milestone_id: z.number().optional()
+    .describe("Milestone ID"),
+  remove_source_branch: z.boolean().optional()
+    .describe("Flag to remove source branch after merge"),
+  squash: z.boolean().optional()
+    .describe("Squash commits into single commit"),
+  draft: z.boolean().optional()
+    .describe("Mark as draft/WIP")
+});
+
+export const DeleteBranchSchema = ProjectParamsSchema.extend({
+  branch: z.string()
+    .describe("Branch name to delete")
+});
+
+export const ApproveMergeRequestSchema = ProjectParamsSchema.extend({
+  merge_request_iid: z.number().or(z.string())
+    .describe("The internal ID of the merge request"),
+  sha: z.string().optional()
+    .describe("SHA of the merge request HEAD commit to approve")
+});
+
+export const UnapproveMergeRequestSchema = ProjectParamsSchema.extend({
+  merge_request_iid: z.number().or(z.string())
+    .describe("The internal ID of the merge request")
+});
+
+export const CancelAutoMergeSchema = ProjectParamsSchema.extend({
+  merge_request_iid: z.number().or(z.string())
+    .describe("The internal ID of the merge request")
+});
+
 // Export types
 export type GitLabTimeStats = z.infer<typeof GitLabTimeStatsSchema>;
 export type GitLabNote = z.infer<typeof GitLabNoteSchema>;
@@ -608,3 +701,11 @@ export type AssignIssue = z.infer<typeof AssignIssueSchema>;
 export type UnassignIssue = z.infer<typeof UnassignIssueSchema>;
 export type CreateIssueLink = z.infer<typeof CreateIssueLinkSchema>;
 export type DeleteIssueLink = z.infer<typeof DeleteIssueLinkSchema>;
+export type GetMergeRequests = z.infer<typeof GetMergeRequestsSchema>;
+export type GetMergeRequest = z.infer<typeof GetMergeRequestSchema>;
+export type MergeMergeRequest = z.infer<typeof MergeMergeRequestSchema>;
+export type UpdateMergeRequest = z.infer<typeof UpdateMergeRequestSchema>;
+export type DeleteBranch = z.infer<typeof DeleteBranchSchema>;
+export type ApproveMergeRequest = z.infer<typeof ApproveMergeRequestSchema>;
+export type UnapproveMergeRequest = z.infer<typeof UnapproveMergeRequestSchema>;
+export type CancelAutoMerge = z.infer<typeof CancelAutoMergeSchema>;

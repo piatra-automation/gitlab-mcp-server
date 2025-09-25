@@ -62,6 +62,14 @@ import {
   UnassignIssueSchema,
   CreateIssueLinkSchema,
   DeleteIssueLinkSchema,
+  GetMergeRequestsSchema,
+  GetMergeRequestSchema,
+  MergeMergeRequestSchema,
+  UpdateMergeRequestSchema,
+  DeleteBranchSchema,
+  ApproveMergeRequestSchema,
+  UnapproveMergeRequestSchema,
+  CancelAutoMergeSchema,
   type GitLabFork,
   type GitLabReference,
   type GitLabRepository,
@@ -111,7 +119,7 @@ const logger = new Logger();
 
 const server = new Server({
   name: "gitlab-mcp-server",
-  version: "1.3.0",
+  version: "1.4.0",
 }, {
   capabilities: {
     tools: {}
@@ -1333,6 +1341,174 @@ async function deleteIssueLink(
   }
 }
 
+// Merge Request Management Functions
+
+async function getMergeRequests(
+  projectId: string,
+  options?: {
+    state?: 'opened' | 'closed' | 'locked' | 'merged' | 'all';
+    orderBy?: 'created_at' | 'updated_at';
+    sort?: 'asc' | 'desc';
+    milestone?: string;
+    labels?: string;
+    authorId?: number;
+    assigneeId?: number;
+    perPage?: number;
+    page?: number;
+  }
+): Promise<any> {
+  const params = new URLSearchParams();
+  if (options?.state) params.append('state', options.state);
+  if (options?.orderBy) params.append('order_by', options.orderBy);
+  if (options?.sort) params.append('sort', options.sort);
+  if (options?.milestone) params.append('milestone', options.milestone);
+  if (options?.labels) params.append('labels', options.labels);
+  if (options?.authorId) params.append('author_id', options.authorId.toString());
+  if (options?.assigneeId) params.append('assignee_id', options.assigneeId.toString());
+  if (options?.perPage) params.append('per_page', options.perPage.toString());
+  if (options?.page) params.append('page', options.page.toString());
+
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/merge_requests?${params}`;
+  return await makeGitLabRequest(url);
+}
+
+async function getMergeRequest(
+  projectId: string,
+  mergeRequestIid: number | string
+): Promise<any> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/merge_requests/${mergeRequestIid}`;
+  return await makeGitLabRequest(url);
+}
+
+async function mergeMergeRequest(
+  projectId: string,
+  mergeRequestIid: number | string,
+  options?: {
+    mergeCommitMessage?: string;
+    squashCommitMessage?: string;
+    shouldRemoveSourceBranch?: boolean;
+    mergeWhenPipelineSucceeds?: boolean;
+    squash?: boolean;
+  }
+): Promise<any> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/merge_requests/${mergeRequestIid}/merge`;
+
+  const body: Record<string, any> = {};
+  if (options?.mergeCommitMessage) body.merge_commit_message = options.mergeCommitMessage;
+  if (options?.squashCommitMessage) body.squash_commit_message = options.squashCommitMessage;
+  if (options?.shouldRemoveSourceBranch !== undefined) body.should_remove_source_branch = options.shouldRemoveSourceBranch;
+  if (options?.mergeWhenPipelineSucceeds !== undefined) body.merge_when_pipeline_succeeds = options.mergeWhenPipelineSucceeds;
+  if (options?.squash !== undefined) body.squash = options.squash;
+
+  return await makeGitLabRequest(url, {
+    method: "PUT",
+    body: JSON.stringify(body)
+  });
+}
+
+async function updateMergeRequest(
+  projectId: string,
+  mergeRequestIid: number | string,
+  options: {
+    title?: string;
+    description?: string;
+    targetBranch?: string;
+    stateEvent?: 'close' | 'reopen';
+    labels?: string;
+    assigneeId?: number;
+    assigneeIds?: number[];
+    reviewerIds?: number[];
+    milestoneId?: number;
+    removeSourceBranch?: boolean;
+    squash?: boolean;
+    draft?: boolean;
+  }
+): Promise<any> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/merge_requests/${mergeRequestIid}`;
+
+  const body: Record<string, any> = {};
+  if (options.title) body.title = options.title;
+  if (options.description !== undefined) body.description = options.description;
+  if (options.targetBranch) body.target_branch = options.targetBranch;
+  if (options.stateEvent) body.state_event = options.stateEvent;
+  if (options.labels !== undefined) body.labels = options.labels;
+  if (options.assigneeId !== undefined) body.assignee_id = options.assigneeId;
+  if (options.assigneeIds) body.assignee_ids = options.assigneeIds;
+  if (options.reviewerIds) body.reviewer_ids = options.reviewerIds;
+  if (options.milestoneId !== undefined) body.milestone_id = options.milestoneId;
+  if (options.removeSourceBranch !== undefined) body.remove_source_branch = options.removeSourceBranch;
+  if (options.squash !== undefined) body.squash = options.squash;
+  if (options.draft !== undefined) body.draft = options.draft;
+
+  return await makeGitLabRequest(url, {
+    method: "PUT",
+    body: JSON.stringify(body)
+  });
+}
+
+async function deleteBranch(
+  projectId: string,
+  branch: string
+): Promise<{ message: string }> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/repository/branches/${encodeURIComponent(branch)}`;
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "Authorization": `Bearer ${GITLAB_PERSONAL_ACCESS_TOKEN}`
+    }
+  });
+
+  if (!response.ok) {
+    return handleApiError(response);
+  }
+
+  // GitLab returns 204 No Content on successful deletion
+  if (response.status === 204) {
+    return { message: `Branch '${branch}' deleted successfully` };
+  }
+
+  return { message: `Branch '${branch}' deleted` };
+}
+
+async function approveMergeRequest(
+  projectId: string,
+  mergeRequestIid: number | string,
+  sha?: string
+): Promise<any> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/merge_requests/${mergeRequestIid}/approve`;
+
+  const body: Record<string, any> = {};
+  if (sha) body.sha = sha;
+
+  return await makeGitLabRequest(url, {
+    method: "POST",
+    body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined
+  });
+}
+
+async function unapproveMergeRequest(
+  projectId: string,
+  mergeRequestIid: number | string
+): Promise<any> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/merge_requests/${mergeRequestIid}/unapprove`;
+
+  return await makeGitLabRequest(url, {
+    method: "POST"
+  });
+}
+
+async function cancelAutoMerge(
+  projectId: string,
+  mergeRequestIid: number | string
+): Promise<any> {
+  const url = `${GITLAB_API_URL}/projects/${encodeURIComponent(projectId)}/merge_requests/${mergeRequestIid}/cancel_merge_when_pipeline_succeeds`;
+
+  return await makeGitLabRequest(url, {
+    method: "POST"
+  });
+}
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
@@ -1527,6 +1703,47 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: "delete_issue_link",
         description: "Remove a link between issues",
         inputSchema: zodToJsonSchema(DeleteIssueLinkSchema)
+      },
+      // Merge Request Management Tools
+      {
+        name: "get_merge_requests",
+        description: "Get list of merge requests from a GitLab project with filters",
+        inputSchema: zodToJsonSchema(GetMergeRequestsSchema)
+      },
+      {
+        name: "get_merge_request",
+        description: "Get detailed information about a specific merge request",
+        inputSchema: zodToJsonSchema(GetMergeRequestSchema)
+      },
+      {
+        name: "merge_merge_request",
+        description: "Merge a merge request (accepts the MR)",
+        inputSchema: zodToJsonSchema(MergeMergeRequestSchema)
+      },
+      {
+        name: "update_merge_request",
+        description: "Update a merge request's details, assignees, or settings",
+        inputSchema: zodToJsonSchema(UpdateMergeRequestSchema)
+      },
+      {
+        name: "delete_branch",
+        description: "Delete a branch from a GitLab project",
+        inputSchema: zodToJsonSchema(DeleteBranchSchema)
+      },
+      {
+        name: "approve_merge_request",
+        description: "Approve a merge request",
+        inputSchema: zodToJsonSchema(ApproveMergeRequestSchema)
+      },
+      {
+        name: "unapprove_merge_request",
+        description: "Remove approval from a merge request",
+        inputSchema: zodToJsonSchema(UnapproveMergeRequestSchema)
+      },
+      {
+        name: "cancel_auto_merge",
+        description: "Cancel automatic merge when pipeline succeeds",
+        inputSchema: zodToJsonSchema(CancelAutoMergeSchema)
       }
     ]
   };
@@ -1807,6 +2024,84 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "delete_issue_link": {
         const validatedArgs = DeleteIssueLinkSchema.parse(args);
         const result = await deleteIssueLink(validatedArgs.project_id, validatedArgs.issue_iid, validatedArgs.link_id);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      // Merge Request Management cases
+      case "get_merge_requests": {
+        const validatedArgs = GetMergeRequestsSchema.parse(args);
+        const result = await getMergeRequests(validatedArgs.project_id, {
+          state: validatedArgs.state,
+          orderBy: validatedArgs.order_by,
+          sort: validatedArgs.sort,
+          milestone: validatedArgs.milestone,
+          labels: validatedArgs.labels,
+          authorId: validatedArgs.author_id,
+          assigneeId: validatedArgs.assignee_id,
+          perPage: validatedArgs.per_page,
+          page: validatedArgs.page
+        });
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case "get_merge_request": {
+        const validatedArgs = GetMergeRequestSchema.parse(args);
+        const result = await getMergeRequest(validatedArgs.project_id, validatedArgs.merge_request_iid);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case "merge_merge_request": {
+        const validatedArgs = MergeMergeRequestSchema.parse(args);
+        const result = await mergeMergeRequest(validatedArgs.project_id, validatedArgs.merge_request_iid, {
+          mergeCommitMessage: validatedArgs.merge_commit_message,
+          squashCommitMessage: validatedArgs.squash_commit_message,
+          shouldRemoveSourceBranch: validatedArgs.should_remove_source_branch,
+          mergeWhenPipelineSucceeds: validatedArgs.merge_when_pipeline_succeeds,
+          squash: validatedArgs.squash
+        });
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case "update_merge_request": {
+        const validatedArgs = UpdateMergeRequestSchema.parse(args);
+        const result = await updateMergeRequest(validatedArgs.project_id, validatedArgs.merge_request_iid, {
+          title: validatedArgs.title,
+          description: validatedArgs.description,
+          targetBranch: validatedArgs.target_branch,
+          stateEvent: validatedArgs.state_event,
+          labels: validatedArgs.labels,
+          assigneeId: validatedArgs.assignee_id,
+          assigneeIds: validatedArgs.assignee_ids,
+          reviewerIds: validatedArgs.reviewer_ids,
+          milestoneId: validatedArgs.milestone_id,
+          removeSourceBranch: validatedArgs.remove_source_branch,
+          squash: validatedArgs.squash,
+          draft: validatedArgs.draft
+        });
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case "delete_branch": {
+        const validatedArgs = DeleteBranchSchema.parse(args);
+        const result = await deleteBranch(validatedArgs.project_id, validatedArgs.branch);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case "approve_merge_request": {
+        const validatedArgs = ApproveMergeRequestSchema.parse(args);
+        const result = await approveMergeRequest(validatedArgs.project_id, validatedArgs.merge_request_iid, validatedArgs.sha);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case "unapprove_merge_request": {
+        const validatedArgs = UnapproveMergeRequestSchema.parse(args);
+        const result = await unapproveMergeRequest(validatedArgs.project_id, validatedArgs.merge_request_iid);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      case "cancel_auto_merge": {
+        const validatedArgs = CancelAutoMergeSchema.parse(args);
+        const result = await cancelAutoMerge(validatedArgs.project_id, validatedArgs.merge_request_iid);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
 
